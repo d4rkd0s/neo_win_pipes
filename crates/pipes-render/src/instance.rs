@@ -38,13 +38,23 @@ impl Default for PipeVisuals {
         Self {
             pipe_radius: 0.18,
             ball_joint_scale: 1.4,
-            // Bigger than a sphere-joint scale would need to be: this is
-            // now the elbow *torus*'s major (bend) radius, and needs real
-            // room beyond its own tube thickness (`geometry::elbow`'s fixed
-            // 0.33 tube-ratio, applied in `renderer.rs`) to read as a
-            // curved bend instead of a ball — verified by actually
-            // rendering it (see CLAUDE.md's testing philosophy point 8).
-            elbow_joint_scale: 3.0,
+            // This is the elbow *torus*'s major (bend) radius, in units of
+            // `pipe_radius`. Bounded above by grid geometry, not just
+            // looks: two turns can be as little as 1 grid unit apart (a
+            // turn immediately followed by another), and each elbow torus
+            // reaches `elbow_joint_scale * pipe_radius` from its own
+            // joint — if that exceeds half a grid unit, two adjacent
+            // elbows physically overlap and self-intersect. At the old
+            // value (3.0 -> 0.54 grid units) this was a real, reproducible
+            // bug: thin sliver artifacts poking out of elbow joints,
+            // caught only by actually rendering an isolated single-pipe
+            // scene and looking closely, not by reading the code (see
+            // docs/ROADMAP.md). 2.5 -> 0.45 grid units leaves a real
+            // margin under the 0.5 limit. `geometry::elbow`'s tube-ratio
+            // (`renderer.rs`) is solved alongside this to keep the tube's
+            // own thickness matching the straight pipe radius regardless
+            // of this value — see its comment.
+            elbow_joint_scale: 2.5,
             cap_scale: 1.1,
             teapot_scale: 3.5,
         }
@@ -215,6 +225,25 @@ fn push_pipe(pipe: &Pipe, visuals: &PipeVisuals, shrink: f32, sets: &mut Instanc
 mod tests {
     use super::*;
     use pipes_core::{Direction, SimConfig};
+
+    #[test]
+    fn elbow_joint_scale_cannot_reach_past_half_a_grid_unit() {
+        // Real regression: two turns can be as little as 1 grid unit
+        // apart (a turn immediately followed by another), so each elbow
+        // torus's reach (`elbow_joint_scale * pipe_radius`) must stay
+        // under half that or two adjacent elbows physically overlap and
+        // self-intersect — a real bug shipped once already (found only by
+        // actually rendering an isolated single-pipe scene and looking
+        // closely at the joints, not by reading this code — see
+        // docs/ROADMAP.md). 0.5 is the exact limit; this leaves a margin.
+        let visuals = PipeVisuals::default();
+        let reach = visuals.elbow_joint_scale * visuals.pipe_radius;
+        assert!(
+            reach < 0.5,
+            "elbow reach {reach} grid units is not safely under the 0.5 limit — \
+             adjacent elbow joints can overlap"
+        );
+    }
 
     /// Approximates the uniform x/y (radius) scale baked into a model
     /// matrix built by `segment_instance`/`point_instance` — rotation

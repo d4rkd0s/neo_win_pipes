@@ -99,6 +99,26 @@ feature branch.
       `tube_ratio` to 0.35 (product 1.05) — the same small-overshoot
       principle `ball_joint_scale`/`cap_scale` already use on the sphere
       joints, for the same reason.
+      **A real, more serious bug shipped in that same 3.0 value and went
+      unnoticed for a while**: two turns can be as little as 1 grid unit
+      apart (a turn immediately followed by another), and each elbow
+      torus reaches `elbow_joint_scale * pipe_radius` from its own joint
+      — at 3.0 that's 0.54 grid units, *more than half* the minimum
+      possible spacing, so two adjacent elbows could physically overlap
+      and self-intersect. Visually this showed up as small, thin sliver/
+      flap artifacts poking out near elbow joints — easy to mistake for
+      the teapot easter egg or an overlapping *different* pipe at a
+      glance, and only conclusively distinguished by rendering an
+      isolated single-pipe, all-elbow scene (`max_pipes: 1`,
+      `elbow_probability: 1.0`) where no other pipe could possibly be
+      responsible, and the artifact was still there at multiple joints.
+      Fixed by lowering `elbow_joint_scale` to 2.5 (0.45 grid units, a
+      real margin under the 0.5 limit) and re-solving `tube_ratio` to
+      0.42 to keep the seam-matching product at 1.05. Has a regression
+      test (`elbow_joint_scale_cannot_reach_past_half_a_grid_unit`)
+      asserting this relationship directly, so a future tuning pass can't
+      reintroduce it by only checking a couple of spot-checked corners
+      the way this one did.
 - [x] **GPU device-loss crash — fixed and verified.** Hit for real testing
       `pipes-settings` on a Windows-on-ARM64 machine (Qualcomm Adreno
       X1-85, Vulkan backend): after ~12 minutes and several scene resets,

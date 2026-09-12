@@ -812,13 +812,16 @@ where
     // cross-section is exactly as round as the straight pipe segments it
     // connects to — the previous 10 was measurably more faceted, visible as
     // a rounder-to-flatter mismatch right at the seam on close inspection.
-    // tube_ratio(0.35) * PipeVisuals::elbow_joint_scale(3.0) = 1.05: the
+    // tube_ratio(0.42) * PipeVisuals::elbow_joint_scale(2.5) = 1.05: the
     // tube's final radius needs to slightly *exceed* the straight segment's
     // radius, not just match it, or the two surfaces leave a visible thin
     // seam/notch exactly at the join — caught by actually rendering a scene
     // and finding it, the same way `ball_joint_scale`/`cap_scale` already
-    // overshoot 1.0 for the same reason on the sphere joints.
-    let elbow_mesh = GpuMesh::upload(&device, &geometry::elbow(0.35, 20, 16), "elbow");
+    // overshoot 1.0 for the same reason on the sphere joints. `tube_ratio`
+    // must be re-solved (= 1.05 / elbow_joint_scale) any time
+    // `elbow_joint_scale` changes, to keep this product fixed — see the
+    // comment on `elbow_joint_scale` for why that value is itself bounded.
+    let elbow_mesh = GpuMesh::upload(&device, &geometry::elbow(0.42, 20, 16), "elbow");
     let teapot_mesh = GpuMesh::upload(&device, &geometry::teapot(), "teapot");
 
     Ok(GpuState {
