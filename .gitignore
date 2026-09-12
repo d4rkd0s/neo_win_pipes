@@ -11,3 +11,7 @@ Thumbs.db
 /installer/out
 *.wixpdb
 /.wix
+
+# scripts/verify.sh's timestamped output — regenerated on every run, not
+# source; see CLAUDE.md's Empirical Verification Contract section.
+/artifacts/verify/

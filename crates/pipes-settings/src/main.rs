@@ -84,6 +84,17 @@ fn main() {
     app_config.sanitize();
     info!(config_path = ?AppConfig::config_path(), "loaded AppConfig (or defaults if missing)");
 
+    // Permanent, opt-in hook for `scripts/verify.sh --simulate-device-loss`
+    // (see CLAUDE.md's Empirical Verification Contract): destroys the GPU
+    // device N frames after launch, so `Renderer::recover_if_needed`'s hot
+    // recovery actually gets exercised end-to-end by the verification
+    // contract instead of only being reasoned about. A no-op unless this
+    // env var is set, so it costs real users nothing.
+    let simulate_device_loss_at_frame: Option<u32> = std::env::var("PIPES_SIMULATE_DEVICE_LOSS")
+        .ok()
+        .and_then(|v| v.parse().ok());
+    let mut frame_count: u32 = 0;
+
     let event_loop = EventLoop::new().expect("failed to create event loop");
     // `mut` is only needed inside the cfg(windows) block below - on other
     // platforms nothing ever reassigns builder, so clippy flags it as
@@ -165,6 +176,14 @@ fn main() {
                     WindowEvent::CloseRequested => elwt.exit(),
                     WindowEvent::Resized(size) => renderer.resize(size.width, size.height),
                     WindowEvent::RedrawRequested => {
+                        frame_count += 1;
+                        if simulate_device_loss_at_frame == Some(frame_count) {
+                            tracing::warn!(
+                                frame_count,
+                                "PIPES_SIMULATE_DEVICE_LOSS: destroying the device now"
+                            );
+                            renderer.device().destroy();
+                        }
                         if let Ok(result) = update_check_rx.try_recv() {
                             if let Some(update) = &result {
                                 info!(version = %update.version, "update available");

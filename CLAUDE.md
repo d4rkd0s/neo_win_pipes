@@ -73,6 +73,51 @@ If linking fails on Windows-on-ARM64, see the caveat in
 `docs/DEVELOPMENT.md` before assuming the code is broken — it's a known
 local-toolchain issue, not a bug in this repo.
 
+## Empirical Verification Contract
+
+**Never assert a visual, rendering, or runtime behavior from reading
+source code alone — always execute and observe.** This isn't a style
+preference: this project has repeatedly shipped real bugs that reading
+the code never would have caught — a hidden 3D preview behind egui's
+opaque default panel, `/s` exiting within milliseconds of its own
+synthetic startup events, a wgpu device-loss panic, a torus joint with a
+visible seam at the exact ratio that looked fine on paper, an update
+toast whose click handler silently did nothing because the toast object
+was dropped. All of these compiled cleanly and passed `cargo test`. Every
+one was only found by actually launching the app, taking a screenshot,
+or deliberately triggering the failure condition — see `docs/ROADMAP.md`
+for the specifics.
+
+`scripts/verify.sh` operationalizes this as a repeatable check:
+
+```sh
+./scripts/verify.sh                          # builds, tests, launches pipes-settings, screenshots it
+./scripts/verify.sh --target pipes-app       # same, but the fullscreen screensaver
+./scripts/verify.sh --simulate-device-loss   # also forces a real GPU device loss mid-run and
+                                              # confirms Renderer::recover_if_needed actually recovers
+```
+
+It builds the workspace, runs the full test suite, launches a real
+binary, waits for it to render real frames, and captures a screenshot via
+`scripts/capture_window.ps1` (a `PrintWindow`-based capture that works
+even when the window isn't focused/visible — needed for background/CI
+runs). It exits non-zero on any build/test/launch/capture failure, or if
+the app log contains an unhandled panic.
+
+**Artifacts land in `artifacts/verify/`**, timestamped per run:
+`<stamp>-run.log` (the full verify transcript), `<stamp>-<target>.log`
+(the launched app's own log output), and `<stamp>-<target>.png` (the
+screenshot) — plus a `-post-recovery.png` when `--simulate-device-loss`
+is used. **Actually open the screenshot and look at it** — a non-empty
+PNG file existing is not the same as the render being correct.
+
+Passing `verify.sh` is necessary, not sufficient: it proves the app
+builds, launches, and renders *something* without crashing. It does not
+by itself prove a specific feature (a particular joint type, a specific
+settings-drawer control, multi-monitor behavior) is correct — for that,
+actually drive the app into the relevant state and inspect the result,
+the same way this file's examples above were originally found.
+
 ## Non-negotiable conventions for this repo
 
 These were established explicitly at project start and apply to every

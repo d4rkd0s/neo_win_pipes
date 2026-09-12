@@ -45,6 +45,17 @@ tests`, and CI runs this exact command on all three OSes (see
   follow-up. This was a project ground rule from day one, not a
   retrofit — see the commit history.
 
+## Empirical verification
+
+See CLAUDE.md's "Empirical Verification Contract" section for the full
+rationale. In short: `cargo build`/`cargo test` passing is necessary but
+not sufficient for anything touching a window, an event loop, or the GPU
+— run `./scripts/verify.sh` (builds, tests, launches a real binary,
+screenshots it) before calling a rendering-affecting change done, and
+`./scripts/verify.sh --simulate-device-loss` after touching anything in
+the device-loss/hot-recovery path. Artifacts land in `artifacts/verify/`
+— actually open the screenshot, don't just check the script exited 0.
+
 ## Benchmarks
 
 `pipes-core` and `pipes-render` each have a [Criterion](https://bheisler.github.io/criterion.rs/book/)
