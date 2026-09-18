@@ -199,6 +199,35 @@ feature branch.
       and `pipes-settings` (screenshotted the 3D preview *and* the egui
       drawer — text, buttons, icons — all correctly rendering again after
       a real, deliberately triggered device loss).
+      **A second, distinct recovery bug shipped in that same v0.7.0**,
+      reported by a real user hitting a blank white window at random —
+      caught from that user's own real crash log (`data/logs/pipes-
+      settings.log.<date>`, see `docs/LOGGING.md`), not a live repro:
+      `try_recover`'s `self.gpu = None` drops the old, already-lost
+      `GpuState` — including its `wgpu::Device` — completely outside any
+      `catch_unwind`, unlike `draw_frame`/`resize`. On a genuine hardware/
+      driver device loss (not the synthetic `Device::destroy()` used to
+      verify this path), wgpu's own `Device::drop` validates against the
+      device and panics ("Error in Device::drop: Validation Error —
+      Caused by: Parent device is lost") — and since nothing caught it,
+      `self.gpu` was left `None` forever (recovery never reaching its
+      `Ok` branch) with no further attempt possible: the process and
+      window survived, but nothing ever rendered into it again, leaving
+      exactly the blank white window the report described. Fixed by
+      `.take()`-ing the old `GpuState` out first (so `self.gpu` is
+      correctly `None` no matter what happens next) and wrapping the
+      actual `drop()` of it in the same `catch_unwind` pattern already
+      used elsewhere. **Honestly flagged**: two different attempts to
+      force this exact panic in this project's own dev environment (a
+      synthetic `Device::destroy()`, with and without an added settle
+      delay / an explicit `poll(Maintain::Wait)` first) both failed to
+      reproduce it — this specific panic appears to need the internal
+      state a genuine driver-level device loss leaves behind, which
+      software-only simulation here can't recreate. The fix is applied
+      and doesn't regress the existing (still-passing) device-loss
+      verification, but wasn't confirmed against the exact failure via a
+      live repro the way the rest of this item was — worth a real user
+      re-confirming against an actual recurrence.
 - [x] **In-app performance benchmark — shipped and verified.** Pipes
       Settings' "Performance" section (`crates/pipes-settings/src/benchmark.rs`)
       runs the *live* renderer through three progressively heavier preset

@@ -138,7 +138,14 @@ structured in seven parts:
   `Renderer::recover_if_needed()` each frame in place of a plain
   `is_device_lost()` check — it attempts recovery once per loss episode,
   then either resumes rendering or falls back to the freeze-on-last-frame
-  behavior if recovery itself fails. `pipes-settings` has one more moving
+  behavior if recovery itself fails. Dropping the old `GpuState` is itself
+  risky: on a real (not synthetic) device loss, wgpu's own `Device::drop`
+  validates against the already-lost device and panics — a second panic
+  site distinct from the `draw_frame`/`resize` ones, found from a real
+  user crash log rather than reasoning about the code (see
+  `docs/ROADMAP.md`). `try_recover` now `.take()`s the old `GpuState` and
+  drops it inside its own `catch_unwind`, so that panic can't leave
+  `Renderer::gpu` permanently `None`. `pipes-settings` has one more moving
   part on top: its `egui_wgpu::Renderer` and `egui::Context` are tied to
   the same device, so a successful recovery also rebuilds both of those —
   see `docs/ROADMAP.md` for why recreating just the `egui_wgpu::Renderer`

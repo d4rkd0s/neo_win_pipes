@@ -202,7 +202,34 @@ impl Renderer {
         // building the replacement while the old surface was still alive
         // silently killed the process with no panic at all (confirmed by
         // actually triggering this path; see the `gpu` field doc).
-        self.gpu = None;
+        //
+        // The drop itself needs the same catch_unwind treatment as
+        // `draw_frame`/`resize`: on a real device loss (a genuine driver
+        // failure, not the synthetic `Device::destroy()` used to verify
+        // this path — see `scripts/verify.sh --simulate-device-loss`),
+        // wgpu's own `Device::drop` validates against the device and
+        // panics ("Error in Device::drop: Validation Error — Caused by:
+        // Parent device is lost") — confirmed from a real crash log
+        // (see docs/ROADMAP.md). That panic previously happened on a
+        // plain `self.gpu = None`, entirely outside any catch_unwind,
+        // so it was never caught: `self.gpu` was left `None` forever
+        // (recovery having never reached the `Ok` branch below) and
+        // nothing ever rendered again, even though the process and
+        // window survived — the window just went blank white and
+        // stayed that way. `.take()` first so `self.gpu` is `None`
+        // (the correct "lost" state either way) before the risky part
+        // even runs.
+        let old_gpu = self.gpu.take();
+        let drop_result = crate::diagnostics::run_suppressing_fatal_dialog(|| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(old_gpu)))
+        });
+        if drop_result.is_err() {
+            tracing::warn!(
+                "dropping the lost GPU device panicked (wgpu's own Device::drop \
+                 validation against an already-lost device) — continuing with \
+                 recovery anyway"
+            );
+        }
         match pollster::block_on(build_gpu(self.window.clone(), size)) {
             Ok(gpu) => {
                 self.gpu = Some(gpu);
