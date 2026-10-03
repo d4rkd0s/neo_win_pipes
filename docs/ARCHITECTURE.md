@@ -511,7 +511,15 @@ step up from that (built from xscreensaver's own real upstream
 not paraphrased), but the driver's actual invocation behavior is still
 unconfirmed against a live install.
 
-### macOS — design only, no code yet
+### macOS — runs from source; no `.saver` code yet
+
+`pipes-app` and `pipes-settings` build and run on macOS today (verified
+on Apple Silicon, Metal backend). The only macOS-specific code so far is
+in `pipes-app::build_window`: `/s` uses winit's macOS *simple*
+fullscreen instead of `Fullscreen::Borderless`, because borderless there
+is the native Spaces transition, which left an unbundled binary showing
+its title bar, menu bar and Dock. Everything below is about the part
+that doesn't exist yet: the system-screensaver wrapper.
 
 A `.saver` is a `NSBundle` implementing `ScreenSaverView`
 (`animateOneFrame`/`drawRect:`), which means Objective-C/Cocoa bridging
@@ -521,8 +529,9 @@ that Xcode's toolchain — not plain `cargo build` — normally produces. No
 code was written for this: unlike Linux's argument parsing, there's no
 meaningfully "pure" sub-piece of this that's both real progress and
 testable without a Mac, so writing Rust/ObjC glue here would just be
-unverified guesswork with extra steps. This is intentionally the least
-complete of the three platforms.
+unverified guesswork with extra steps. A Mac is now available for
+verification, so this is unblocked, but no `.saver` code has been
+written yet.
 
 Each wrapper's job, on every platform, is to be a *thin* shell — handle
 the OS's window-embedding/preview/config contract, then hand off to the
@@ -709,6 +718,12 @@ human clicks once.
   reasonable cadence; revisit if it isn't in practice.
 
 ### Update notification (`pipes-settings::notify`)
+
+The update *check* itself is also Windows-only now:
+`pipes-settings::spawn_update_check` returns without checking on other
+platforms, because the only installer `update.rs` can fetch and launch is
+the `.msi` via `msiexec`. Before that, macOS showed an "Update Now" banner
+that would have downloaded the Windows installer and failed to run it.
 
 Windows-only for now (see `docs/ROADMAP.md` for why: no Linux/macOS
 machine to verify a notification actually renders/is clickable, and

@@ -25,6 +25,7 @@
 // event that kills this whole process, not just the console.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cursor_exit;
 mod screensaver_args;
 #[cfg(windows)]
 mod winsaver;
@@ -33,6 +34,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use cursor_exit::CursorExitGuard;
 use glam::Mat4;
 use pipes_core::{Scene, SceneEvent};
 use pipes_render::{build_instances, tile_projection, AppConfig, MonitorMode, Renderer};
@@ -42,7 +44,9 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::monitor::MonitorHandle;
-use winit::window::{Fullscreen, Window, WindowBuilder, WindowId};
+#[cfg(not(target_os = "macos"))]
+use winit::window::Fullscreen;
+use winit::window::{Window, WindowBuilder, WindowId};
 
 // winit's cross-platform `with_window_icon` only sets the small (title
 // bar) icon on Windows — the taskbar button uses a separate "big" icon
@@ -124,10 +128,36 @@ fn build_window(
         builder = builder.with_taskbar_icon(pipes_render::app_icon::window_icon());
     }
     builder = match mode {
+        // On macOS, winit's `Fullscreen::Borderless` is the native Spaces
+        // transition, which an unbundled binary doesn't get: verified on
+        // macOS 26 that the window instead opened with its title bar,
+        // traffic-light buttons, menu bar and Dock all still showing. So
+        // there it's placed over the monitor here and switched to "simple"
+        // (pre-Lion, same-Space) fullscreen right after creation below —
+        // which is also the right shape for a screensaver anyway: no Space
+        // animation, menu bar and Dock hidden.
+        #[cfg(target_os = "macos")]
+        ScreensaverMode::Show => match &monitor {
+            Some(monitor) => builder
+                .with_position(monitor.position())
+                .with_inner_size(monitor.size()),
+            None => builder,
+        },
+        #[cfg(not(target_os = "macos"))]
         ScreensaverMode::Show => builder.with_fullscreen(Some(Fullscreen::Borderless(monitor))),
         _ => builder.with_inner_size(LogicalSize::new(320.0, 240.0)),
     };
-    Arc::new(builder.build(event_loop).expect("failed to create window"))
+    let window = builder.build(event_loop).expect("failed to create window");
+    #[cfg(target_os = "macos")]
+    if mode == ScreensaverMode::Show {
+        use winit::platform::macos::WindowExtMacOS;
+        if !window.set_simple_fullscreen(true) {
+            tracing::warn!(
+                "macOS simple fullscreen was refused; showing in a plain window instead"
+            );
+        }
+    }
+    Arc::new(window)
 }
 
 /// One monitor's worth of screensaver state under `MonitorMode::AllMonitors`:
@@ -460,9 +490,15 @@ fn main() {
     // would exit almost instantly on its own startup events rather than
     // real user input. Verified by hitting exactly this bug: the window
     // closed within milliseconds, before a single frame rendered.
+    // Keyboard and mouse-button replays are only ever startup noise, so the
+    // grace period alone handles them. Cursor reports need more: on macOS
+    // the synthetic "here's where the cursor already is" report can land
+    // *after* the grace period too, so each window also has to see the
+    // cursor genuinely travel before that counts — see `cursor_exit.rs`.
     const INPUT_GRACE: Duration = Duration::from_millis(750);
     let exit_on_input_now =
         move |start: Instant| exit_on_any_input && start.elapsed() > INPUT_GRACE;
+    let mut cursor_guards: HashMap<usize, CursorExitGuard> = HashMap::new();
 
     event_loop
         .run(move |event, elwt| match event {
@@ -482,8 +518,22 @@ fn main() {
                         state: ElementState::Pressed,
                         ..
                     } if exit_on_input_now(start) => return elwt.exit(),
-                    WindowEvent::CursorMoved { .. } if exit_on_input_now(start) => {
-                        return elwt.exit()
+                    WindowEvent::CursorMoved { position, .. } if exit_on_any_input => {
+                        let moved = cursor_guards
+                            .entry(idx)
+                            .or_default()
+                            .is_real_motion(position.x, position.y);
+                        if exit_on_input_now(start) {
+                            if moved {
+                                return elwt.exit();
+                            }
+                            tracing::debug!(
+                                window = idx,
+                                x = position.x,
+                                y = position.y,
+                                "ignored cursor report at an unmoved position"
+                            );
+                        }
                     }
                     _ => {}
                 }

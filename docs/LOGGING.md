@@ -55,6 +55,9 @@ identifying details, at what time.
 | `scene reset (dissolve complete)` | INFO | `Scene::step` | `tick`                                                | The dissolve countdown from `scene dissolving (grid filled)` reached zero; everything cleared and restarts. |
 | `tick summary`        | INFO  | `pipes-app` main loop    | `tick`, `live_pipes`, `occupancy`                     | Periodic (every 50 ticks) heartbeat so a long run is still legible without DEBUG noise. |
 | `neo_win_pipes starting` / `finished` | INFO | `pipes-app` main | `ticks`, `seed` / `elapsed_ms`, totals | Process lifecycle bookends. |
+| `ignored cursor report at an unmoved position` | DEBUG | `pipes-app` event loop (`/s` mode) | `window`, `x`, `y` | A `CursorMoved` arrived after the startup grace period but within `cursor_exit::MOVE_THRESHOLD_PX` of where that window first saw the cursor, so it was treated as the OS re-reporting a stationary cursor rather than the user moving it — the screensaver keeps running. Seeing these in a log is the guard doing its job, not a problem. |
+| `macOS simple fullscreen was refused; showing in a plain window instead` | WARN | `pipes-app` `build_window` (macOS only) | — | `/s` asked AppKit for simple (same-Space) fullscreen and it declined, so this run is showing in an ordinary window with the menu bar and Dock visible. Not expected in normal use; worth a bug report with the macOS version. |
+| `update check skipped: in-app updates install the Windows .msi` | INFO | `pipes-settings` `spawn_update_check` (macOS/Linux) | — | The in-app updater only knows how to install the Windows `.msi`, so on other platforms it doesn't check at all and never shows an update banner or toast. Expected on every macOS/Linux launch. |
 
 ## Levels, and when to use which
 

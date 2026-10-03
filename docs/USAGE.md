@@ -1,8 +1,10 @@
 # Usage
 
 > **Status**: Windows and Linux both have real installers (`.msi`;
-> `.deb`/AppImage) and are verified working on real hardware. macOS is
-> design-only — no code, no `.pkg` — see [ROADMAP.md](ROADMAP.md).
+> `.deb`/AppImage) and are verified working on real hardware. macOS
+> builds and runs from source (verified on Apple Silicon) but has no
+> installer or `.saver` bundle yet — see [macOS](#macos) below and
+> [ROADMAP.md](ROADMAP.md).
 
 ## System requirements
 
@@ -24,7 +26,8 @@ below), rather than a broad hardware survey:
   single tick at single-digit microseconds even on a large 64³-grid,
   200-pipe scene (see `docs/DEVELOPMENT.md`).
 - **OS**: Windows 10/11 (x64 or ARM64) or a Linux desktop running
-  `xscreensaver` (X11). macOS isn't buildable yet at all — see above.
+  `xscreensaver` (X11). macOS (Apple Silicon verified) runs from source
+  but isn't installable as a screensaver yet — see [macOS](#macos).
 
 **Don't take these numbers as gospel for your own machine** — GPUs vary
 enormously, and this project has only actually measured a small number of
@@ -226,9 +229,25 @@ to test that path manually.
 
 ## macOS
 
-Not installable yet, and no code exists at all — not even argument
-parsing, unlike Linux. See
-[ROADMAP.md](ROADMAP.md#macos--not-started) for why (no way to compile
-Objective-C/Swift or link a Mach-O binary from this project's Windows dev
-machine). Once it exists, the end state is the same shape as the others:
-select "Neo Pipes" from *System Settings → Screen Saver*.
+Runs from source, but isn't installable as a system screensaver yet.
+Verified on an Apple Silicon Mac (macOS 26, Metal backend):
+
+```sh
+cargo run -p pipes-app -- --seed 1   # fullscreen screensaver; any key, click or mouse move exits
+cargo run -p pipes-settings          # live preview + settings drawer
+cargo run -p pipes-app -- /c         # opens Pipes Settings, like the Windows config button
+```
+
+- `/s` covers the whole display in macOS "simple" fullscreen: the menu
+  bar and Dock hide, and no new Space is created.
+- Pipes Settings saves to
+  `~/Library/Application Support/dev.neo-win-pipes.neo_win_pipes/config.toml`.
+- There's no in-app update check on macOS. The updater only knows how to
+  install the Windows `.msi`, so it's skipped entirely rather than
+  offering a download that can't run.
+- `/p <hwnd>` is Windows-only; on macOS it logs a warning and opens an
+  ordinary window.
+
+What's missing is the `.saver` bundle macOS loads into its own screen
+saver host, which is what makes it selectable in *System Settings →
+Screen Saver*. See [ROADMAP.md](ROADMAP.md#macos--not-started).

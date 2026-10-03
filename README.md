@@ -16,17 +16,19 @@ Pushing a version tag publishes a new release automatically, and
 installed copies notice and offer a one-click update — free, no paid
 update host or background service, just GitHub's own Releases API (one
 UAC prompt per update is unavoidable, since the screensaver lives in
-`System32`). macOS/Linux aren't installable screensavers yet (Linux has
-tested argument parsing; macOS is design-only so far — see
+`System32`). Linux installs as an `xscreensaver` hack (`.deb`/AppImage).
+macOS builds and runs from source on Apple Silicon — the screensaver
+fullscreen and Pipes Settings both verified on a real Mac — but isn't an
+installable screensaver yet: there's no `.saver` bundle. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the honest per-platform
-breakdown and what's next).
+breakdown and what's next.
 
 ![A window full of colored 3D pipes growing through a grid](docs/screenshots/phase2-first-render-seed3.png)
 
 ## Quick start
 
 ```sh
-cargo test --workspace                  # run the full test suite (123 tests)
+cargo test --workspace                  # run the full test suite (140 tests)
 cargo run -p pipes-app -- --seed 1      # the screensaver itself
 cargo run -p pipes-app -- /s            # ...or exercise the real Windows contract directly
 cargo run -p pipes-settings             # live preview + settings drawer

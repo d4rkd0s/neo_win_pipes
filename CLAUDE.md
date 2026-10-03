@@ -38,17 +38,22 @@ cleanly from a stock desktop's package manager end to end, but the
 core "does it render" question — this project's previous single
 biggest open assumption on Linux — is closed.
 
-**macOS is still design-only** — no code at all, no `.saver` bundle, not
-even argument parsing, because there's no way to compile Objective-C/Swift
-or link a Mach-O binary from this project's Windows dev machine at all
-(unlike Linux, which at least cross-compiles/type-checks here). See
-`docs/ROADMAP.md` before claiming otherwise about either platform.
+**macOS runs from source, but has no `.saver` bundle yet.** `pipes-app`
+and `pipes-settings` were built and run on a real Apple Silicon Mac
+(macOS 26): `/s` fullscreen (macOS simple fullscreen — see
+`build_window`), exit-on-input, and Pipes Settings all verified by
+launching and screenshotting. There's still no `ScreenSaverView`/`.saver`
+code, so it isn't installable or selectable in System Settings, and
+`scripts/verify.sh` is still Windows-only (`taskkill`, PowerShell
+capture). Verify macOS changes on a Mac, not from the Windows dev
+machine. See `docs/ROADMAP.md` before claiming otherwise about either
+platform.
 
 ## Commands
 
 ```sh
 cargo build --workspace
-cargo test --workspace               # must pass before any change is done — 132 tests as of this writing (Phase 4, Windows + Linux)
+cargo test --workspace               # must pass before any change is done — 140 tests as of this writing (Phase 4; Windows + Linux, macOS from source)
 cargo run -p pipes-app -- --seed 1  # the screensaver, dev mode (behaves like /s)
 cargo run -p pipes-app -- /s        # exercise the real Windows contract directly
 cargo run -p pipes-app -- /c        # launches pipes-settings, exits

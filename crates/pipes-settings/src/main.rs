@@ -41,8 +41,20 @@ mod update;
 /// showing the window, and can't hang the app if GitHub is slow/down —
 /// `check_for_update` itself already treats any failure as "no update"
 /// (see update.rs), so this just adds "don't block the UI thread either."
+///
+/// Windows-only for now: the only installer the updater knows how to fetch
+/// and run is the `.msi` (via `msiexec`), so on macOS and Linux it used to
+/// offer an "Update Now" that downloaded the Windows installer and then
+/// failed to launch it — verified on macOS 26, where the banner offered
+/// v0.7.0 and `msiexec` doesn't exist. Returning with `tx` already dropped
+/// means the receiver never yields an update there, so no banner and no
+/// toast. Revisit once those platforms have an installer the updater can run.
 fn spawn_update_check() -> mpsc::Receiver<Option<update::AvailableUpdate>> {
     let (tx, rx) = mpsc::channel();
+    if !cfg!(windows) {
+        info!("update check skipped: in-app updates install the Windows .msi");
+        return rx;
+    }
     std::thread::spawn(move || {
         let current = semver::Version::parse(env!("CARGO_PKG_VERSION"))
             .expect("CARGO_PKG_VERSION is valid semver");

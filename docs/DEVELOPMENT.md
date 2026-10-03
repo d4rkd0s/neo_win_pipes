@@ -6,7 +6,11 @@
   edition 2021, `rust-version` unset (any recent stable works).
 - A platform C/C++ toolchain, for the MSVC/native linker Rust needs:
   - **Windows**: [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) with the "Desktop development with C++" workload (installs the MSVC linker `link.exe`/`cl.exe`). See the **Windows on ARM caveat** below if you're on an ARM64 machine.
-  - **macOS**: Xcode Command Line Tools (`xcode-select --install`).
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`). Debug
+    builds rely on the `[profile.dev.package.objc2]`/`icrate` overrides in
+    the workspace `Cargo.toml` — without them, `cargo run -p pipes-app`
+    panics while listing displays (an `icrate 0.0.4` encoding mismatch
+    that only debug builds check; see the comment there).
   - **Linux**: `build-essential` (Debian/Ubuntu) or your distro's equivalent (`gcc`, `pkg-config`).
 - Phase 2 onward will also need GPU drivers with Vulkan/Metal/DX12 support
   for `wgpu` — not required yet for Phase 1 (headless).

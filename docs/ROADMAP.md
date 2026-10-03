@@ -420,19 +420,48 @@ for the full writeup per platform.
       saver window, i.e. a black screen; `args::resolve_target_window`
       now reads both channels.
 
-### macOS — design only, no `.saver` code yet
+### macOS — runs from source, no `.saver` code yet
 
 - [x] Confirmed by the first real CI run: the existing workspace (`pipes-core`,
       `pipes-render`, `pipes-app`, `pipes-settings`, `pipes-xscreensaver` —
       everything that exists so far) builds and passes its tests on
       `macos-latest` in 1m29s. Useful, but not the same thing as a `.saver`
       — no `ScreenSaverView`/bundle code exists yet.
+- [x] Pilot-tested on a real Mac (Apple Silicon, A18 Pro, macOS 26.4.1,
+      wgpu Metal backend): the workspace builds, the full test suite
+      passes, and both GUI binaries launch and render. Four macOS
+      problems turned up, all fixed and re-verified on the same machine
+      by launching and screenshotting:
+  - [x] **`/s` wasn't fullscreen.** `Fullscreen::Borderless` is the
+        native Spaces transition on macOS, and the unbundled binary
+        opened as a titled window with the menu bar and Dock showing.
+        `/s` now uses winit's macOS simple fullscreen
+        (`build_window`): edge to edge, menu bar and Dock hidden.
+  - [x] **`/s` sometimes quit on its own** about 0.8s after launch, just
+        past the 750ms input grace period, with nobody touching the
+        machine (3 of 15 hands-off runs before; 0 of 20 after). The
+        trigger was the old fullscreen transition: a hands-off A/B with
+        only the fullscreen change (old cursor logic) also survived 10
+        of 10. As defense in depth, a `CursorMoved` now only counts once
+        the cursor has really traveled (`cursor_exit.rs`, unit-tested);
+        a real mouse move, a keypress and a click still exit, and a
+        3-point jiggle doesn't — all checked with synthetic input.
+  - [x] **Pipes Settings offered Mac users the Windows `.msi` update.**
+        The update check is now skipped outside Windows (it can only
+        install the `.msi`), so no banner or toast appears there. This
+        fixes the same latent bug on Linux, though that part was only
+        reasoned from the code, not run on Linux.
+  - [x] **Debug builds panicked listing displays** (`icrate 0.0.4`'s
+        `NSFastEnumeration` encoding vs. current macOS, checked only
+        with debug assertions). Fixed with debug-assertion overrides for
+        just `objc2` and `icrate` in the workspace `Cargo.toml`;
+        `cargo run -p pipes-app` works on macOS. Remove after moving
+        past winit 0.29.
 - [ ] Not started. A `.saver` is an `NSBundle` implementing
       `ScreenSaverView` (`objc2` + `objc2-screen-saver`), built as a
       `cdylib` with `-bundle` and an `Info.plist` — normally an Xcode-
-      toolchain job, not plain `cargo build`. No code was written here:
-      unlike Linux's argument parsing, there's no piece of this that's
-      both real progress and verifiable without a Mac.
+      toolchain job, not plain `cargo build`. No code was written here
+      yet. A Mac is now available to verify it on, so it's unblocked.
 
 ### Cross-platform
 
@@ -445,7 +474,9 @@ for the full writeup per platform.
       daemon, rendering confirmed by screenshot — see the Linux section
       above), though it isn't automated in CI yet, since a GPU-backed X
       server isn't something the stock `ubuntu-latest` runner provides;
-      macOS is still blocked on the `.saver` code not existing at all.
+      macOS has been smoke-tested by hand on a real Mac (see the macOS
+      section above), but the `.saver` code doesn't exist yet and
+      `scripts/verify.sh` doesn't run on macOS.
 - [x] Multi-monitor behavior — three modes, a Pipes Settings toggle:
       `MonitorMode::AllMonitors` (default, independent per-display
       instances, each with a distinct-but-deterministic seed via
@@ -655,9 +686,10 @@ for the full writeup per platform.
 
 - [ ] Signed `.pkg`/`.dmg` installing the `.saver` bundle (unsigned/
       ad-hoc-signed builds until there's an Apple Developer ID) — blocked
-      on the `.saver` itself not existing yet (Phase 3), which is itself
-      blocked on having any way to compile Objective-C/Swift or link a
-      Mach-O binary at all from this project's dev machine.
+      on the `.saver` itself not existing yet (Phase 3). Distributing
+      outside the Mac App Store without Gatekeeper warnings needs an
+      Apple Developer Program membership for Developer ID signing and
+      notarization.
 
 ## Explicitly out of scope for now
 
