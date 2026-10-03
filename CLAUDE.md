@@ -32,9 +32,9 @@ into a bare X server's root window, and into the window a live
 `xscreensaver` 6.08 daemon hands it. That second case needed a real fix —
 the daemon passes no CLI args at all, only the `XSCREENSAVER_WINDOW`
 env var (`args::resolve_target_window` now reads both, argv taking
-precedence — see `docs/ROADMAP.md` for the full writeup). Still no macOS
-verification story, and no one's yet confirmed the packages install
-cleanly from a stock desktop's package manager end to end, but the
+precedence — see `docs/ROADMAP.md` for the full writeup). No one's yet
+confirmed the packages install cleanly from a stock desktop's package
+manager end to end, but the
 core "does it render" question — this project's previous single
 biggest open assumption on Linux — is closed.
 
